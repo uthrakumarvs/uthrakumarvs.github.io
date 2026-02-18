@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic-Tac-Toe | Uthra Kumar</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a0f; --card: #1a1a2e; --text: #e8e8f0; --muted: #a0a0b8;
+      --accent: #6c63ff; --accent-glow: rgba(108,99,255,0.3);
+      --gradient: linear-gradient(135deg, #6c63ff, #e040fb, #00bcd4);
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --mono: 'SF Mono', 'Fira Code', monospace;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+    a { color: var(--accent); text-decoration: none; }
+    .back { position: fixed; top: 1.5rem; left: 1.5rem; font-family: var(--mono); font-size: 0.9rem; color: var(--muted); transition: color 0.3s; }
+    .back:hover { color: var(--text); }
+
+    h1 { font-size: 2rem; margin-bottom: 0.3rem; background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .subtitle { color: var(--muted); margin-bottom: 2rem; font-size: 0.95rem; }
+
+    .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 300px; height: 300px; background: rgba(108,99,255,0.15); border-radius: 12px; padding: 6px; }
+    .cell {
+      background: var(--card); border: none; border-radius: 8px; font-size: 2.5rem; font-weight: 800;
+      color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease; font-family: var(--font);
+    }
+    .cell:hover:not(.taken) { background: rgba(108,99,255,0.15); transform: scale(1.04); }
+    .cell.taken { cursor: default; }
+    .cell.x { color: #6c63ff; }
+    .cell.o { color: #e040fb; }
+    .cell.win { background: rgba(108,99,255,0.25); box-shadow: 0 0 20px var(--accent-glow); }
+
+    .status { margin-top: 1.5rem; font-size: 1.1rem; font-weight: 600; min-height: 1.5em; text-align: center; }
+    .controls { margin-top: 1.2rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+    .btn {
+      padding: 0.6rem 1.5rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; border: none; transition: all 0.3s ease;
+      background: var(--gradient); color: #fff; box-shadow: 0 4px 15px var(--accent-glow);
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px var(--accent-glow); }
+
+    .toggle-group { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(108,99,255,0.3); }
+    .toggle-btn {
+      padding: 0.5rem 1rem; font-size: 0.8rem; font-weight: 600; border: none;
+      background: transparent; color: var(--muted); cursor: pointer; transition: all 0.3s;
+      font-family: var(--font);
+    }
+    .toggle-btn.active { background: rgba(108,99,255,0.2); color: var(--text); }
+
+    .scoreboard { margin-top: 1.5rem; display: flex; gap: 2rem; }
+    .score { text-align: center; }
+    .score-val { font-size: 1.8rem; font-weight: 800; }
+    .score-val.x-score { color: #6c63ff; }
+    .score-val.o-score { color: #e040fb; }
+    .score-val.d-score { color: var(--muted); }
+    .score-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  </style>
+</head>
+<body>
+  <a href="/" class="back">&larr; Back</a>
+  <h1>Tic-Tac-Toe</h1>
+  <p class="subtitle">Play against the AI or a friend</p>
+
+  <div class="board" id="board"></div>
+  <div class="status" id="status">Your turn (X)</div>
+
+  <div class="controls">
+    <button class="btn" id="resetBtn">New Game</button>
+    <div class="toggle-group">
+      <button class="toggle-btn active" data-mode="ai">vs AI</button>
+      <button class="toggle-btn" data-mode="pvp">2 Player</button>
+    </div>
+  </div>
+
+  <div class="scoreboard">
+    <div class="score"><div class="score-val x-score" id="xScore">0</div><div class="score-label">X Wins</div></div>
+    <div class="score"><div class="score-val d-score" id="dScore">0</div><div class="score-label">Draws</div></div>
+    <div class="score"><div class="score-val o-score" id="oScore">0</div><div class="score-label">O Wins</div></div>
+  </div>
+
+  <script>
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    let board, turn, gameOver, mode, scores;
+
+    function init() {
+      board = Array(9).fill('');
+      turn = 'X';
+      gameOver = false;
+      scores = scores || { X: 0, O: 0, D: 0 };
+      mode = mode || 'ai';
+      render();
+      updateStatus();
+    }
+
+    function render() {
+      const el = document.getElementById('board');
+      el.innerHTML = '';
+      board.forEach((v, i) => {
+        const cell = document.createElement('button');
+        cell.className = 'cell' + (v ? ' taken ' + v.toLowerCase() : '');
+        cell.textContent = v;
+        cell.addEventListener('click', () => play(i));
+        el.appendChild(cell);
+      });
+    }
+
+    function updateStatus() {
+      const el = document.getElementById('status');
+      if (gameOver) return;
+      if (mode === 'ai') {
+        el.textContent = turn === 'X' ? 'Your turn (X)' : 'AI thinking...';
+      } else {
+        el.textContent = turn + "'s turn";
+      }
+    }
+
+    function checkWin(b, p) {
+      return wins.find(w => w.every(i => b[i] === p));
+    }
+
+    function play(i) {
+      if (board[i] || gameOver) return;
+      if (mode === 'ai' && turn === 'O') return;
+      board[i] = turn;
+      render();
+
+      const w = checkWin(board, turn);
+      if (w) return endGame(turn, w);
+      if (board.every(c => c)) return endGame('D');
+
+      turn = turn === 'X' ? 'O' : 'X';
+      updateStatus();
+
+      if (mode === 'ai' && turn === 'O' && !gameOver) {
+        setTimeout(aiMove, 400);
+      }
+    }
+
+    function aiMove() {
+      if (gameOver) return;
+      const move = bestMove();
+      board[move] = 'O';
+      render();
+
+      const w = checkWin(board, 'O');
+      if (w) return endGame('O', w);
+      if (board.every(c => c)) return endGame('D');
+
+      turn = 'X';
+      updateStatus();
+    }
+
+    function bestMove() {
+      // Try to win
+      for (let i = 0; i < 9; i++) { if (!board[i]) { board[i] = 'O'; if (checkWin(board, 'O')) { board[i] = ''; return i; } board[i] = ''; } }
+      // Block
+      for (let i = 0; i < 9; i++) { if (!board[i]) { board[i] = 'X'; if (checkWin(board, 'X')) { board[i] = ''; return i; } board[i] = ''; } }
+      // Center
+      if (!board[4]) return 4;
+      // Corners
+      const corners = [0,2,6,8].filter(i => !board[i]);
+      if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
+      // Edges
+      const edges = [1,3,5,7].filter(i => !board[i]);
+      return edges[Math.floor(Math.random() * edges.length)];
+    }
+
+    function endGame(winner, line) {
+      gameOver = true;
+      const status = document.getElementById('status');
+      if (winner === 'D') {
+        status.textContent = "It's a draw!";
+        scores.D++;
+      } else {
+        status.textContent = (mode === 'ai' ? (winner === 'X' ? 'You win!' : 'AI wins!') : winner + ' wins!');
+        scores[winner]++;
+        if (line) {
+          const cells = document.querySelectorAll('.cell');
+          line.forEach(i => cells[i].classList.add('win'));
+        }
+      }
+      document.getElementById('xScore').textContent = scores.X;
+      document.getElementById('oScore').textContent = scores.O;
+      document.getElementById('dScore').textContent = scores.D;
+    }
+
+    document.getElementById('resetBtn').addEventListener('click', init);
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        mode = btn.dataset.mode;
+        scores = { X: 0, O: 0, D: 0 };
+        document.getElementById('xScore').textContent = 0;
+        document.getElementById('oScore').textContent = 0;
+        document.getElementById('dScore').textContent = 0;
+        init();
+      });
+    });
+
+    init();
+  </script>
+</body>
+</html>
